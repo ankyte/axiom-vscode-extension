@@ -1,66 +1,60 @@
 {
-    "name": "axiom",
-    "displayName": "Axiom",
-    "description": "Axiom eXtracts Intent from organization memory",
-    "version": "1.0.0",
-    "activationEvents": [
-        "onLanguage:python",
-        "onView:exceptionWrapper.sidebar"
+  "name": "axiom",
+  "displayName": "AXIOM",
+  "description": "AXIOM eXtracts Intent from Operational Memory",
+  "version": "1.0.0",
+  "main": "./out/extension.js",
+  "engines": {
+    "vscode": "^1.107.0"
+  },
+  "activationEvents": [
+    "onCommand:axiom.initialize",
+    "onCommand:axiom.context",
+    "onCommand:axiom.caveman",
+    "onCommand:axiom.summary",
+    "onCommand:axiom.risks",
+    "onCommand:axiom.why",
+    "onCommand:axiom.copyContext",
+    "onCommand:axiom.exportContext",
+    "onView:axiom.sidebar"
+  ],
+  "scripts": {
+    "compile": "tsc -p ./"
+  },
+  "contributes": {
+    "commands": [
+      { "command": "axiom.initialize", "title": "AXIOM: Initialize Repository" },
+      { "command": "axiom.context", "title": "/axiom-context" },
+      { "command": "axiom.caveman", "title": "/axiom-caveman" },
+      { "command": "axiom.summary", "title": "/axiom-summary" },
+      { "command": "axiom.risks", "title": "/axiom-risks" },
+      { "command": "axiom.why", "title": "/axiom-why" },
+      { "command": "axiom.copyContext", "title": "AXIOM: Copy AXIOM Context" },
+      { "command": "axiom.exportContext", "title": "AXIOM: Export Context" }
     ],
-    "scripts": {
-        "compile": "tsc -p ./"
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "axiom",
+          "title": "AXIOM",
+          "icon": "media/icon.svg"
+        }
+      ]
     },
-    "main": "./out/extension.js",
-    "engines": {
-        "vscode": "^1.107.0"
-    },
-    "contributes": {
-        "commands": [
-            {
-                "command": "wrapSelection.tryExcept",
-                "title": "Wrap in try/except"
-            }
-        ],
-        "viewsContainers": {
-            "activitybar": [
-                {
-                    "id": "exceptionWrapper",
-                    "title": "Axiom",
-                    "icon": "media/icon.svg"
-                }
-            ]
-        },
-        "views": {
-            "exceptionWrapper": [
-                {
-                    "id": "exceptionWrapper.sidebar",
-                    "name": "Axiom",
-                    "type": "webview"
-                }
-            ]
-        },
-        "menus": {
-            "editor/context": [
-                {
-                    "command": "wrapSelection.tryExcept",
-                    "when": "editorLangId == python && editorHasSelection",
-                    "group": "navigation@50"
-                }
-            ]
-        },
-        "keybindings": [
-            {
-                "command": "wrapSelection.tryExcept",
-                "key": "ctrl+alt+t",
-                "mac": "cmd+alt+t",
-                "when": "editorTextFocus && editorLangId == python && editorHasSelection"
-            }
-        ]
-    },
-    "devDependencies": {
-        "@types/node": "^22.0.0",
-        "@types/vscode": "^1.107.0",
-        "@vscode/vsce": "^3.9.1",
-        "typescript": "^6.0.3"
+    "views": {
+      "axiom": [
+        {
+          "id": "axiom.sidebar",
+          "name": "Operational Memory",
+          "type": "webview"
+        }
+      ]
     }
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.107.0",
+    "@vscode/vsce": "^3.9.1",
+    "typescript": "^6.0.3"
+  }
 }

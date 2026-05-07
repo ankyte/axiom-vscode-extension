@@ -1,0 +1,23 @@
+[
+  {
+    "id": "204",
+    "title": "Add queue fallback for payment retries",
+    "summary": "When upstream payment API errors exceed threshold, requests are persisted to queue for async recovery.",
+    "decision": "Prioritize successful capture over immediate latency.",
+    "risk": "Queue saturation during burst traffic."
+  },
+  {
+    "id": "217",
+    "title": "Centralize retry policy in middleware",
+    "summary": "Retry behavior moved from handlers into middleware to reduce divergence and hidden behavior.",
+    "decision": "Consistency over per-service customization.",
+    "risk": "Incorrect shared policy could affect all services simultaneously."
+  },
+  {
+    "id": "231",
+    "title": "Auth token cache refresh",
+    "summary": "Refresh window increased to reduce expiry race conditions.",
+    "decision": "Reliability over token staleness strictness.",
+    "risk": "Potential stale-token interval under edge load."
+  }
+]
