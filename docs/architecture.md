@@ -6,7 +6,13 @@ flowchart TD
   B --> B1[File Scanner]
   B --> B2[Git Commit Parser]
   B --> B3[Mock PR Loader]
+  B --> B4[AI Context Adapters]
+  B4 --> B41[Copilot Adapter]
+  B4 --> B42[Windsurf Adapter Scaffold]
+  B4 --> B43[Markdown Adapter Scaffold]
+  B41 --> B5[Intent Extraction WHAT WHY IMPACT]
   B --> C[Caveman Engine]
+  B5 --> C
 
   C --> C1[Caveman Summaries]
   C --> C2[Developer Summaries]

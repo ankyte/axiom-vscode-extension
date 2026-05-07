@@ -58,6 +58,18 @@ export class AxiomSidebarProvider implements vscode.WebviewViewProvider {
     const graphInfo = m
       ? `${m.graph.nodes.length} nodes / ${m.graph.edges.length} edges`
       : 'No graph generated';
+    const importedAI = m
+      ? m.importedAIContext.slice(0, 4).map((c) => `<li>[${escapeHtml(c.source)}] ${escapeHtml(c.what)}</li>`).join('')
+      : '<li>Not indexed</li>';
+    const aiDecisions = m
+      ? m.historicalAIDecisions.slice(0, 4).map((d) => `<li>${escapeHtml(d)}</li>`).join('')
+      : '<li>Not indexed</li>';
+    const aiRisks = m
+      ? m.aiDerivedRisks.slice(0, 4).map((r) => `<li>${escapeHtml(r)}</li>`).join('')
+      : '<li>Not indexed</li>';
+    const aiReasoning = m
+      ? m.aiReasoningSummaries.slice(0, 4).map((r) => `<li>${escapeHtml(r)}</li>`).join('')
+      : '<li>Not indexed</li>';
 
     this.view.webview.html = `<!DOCTYPE html>
 <html lang="en">
@@ -176,6 +188,36 @@ button:focus-visible {
   <div class="section">
     <h3>Context Graph</h3>
     <p class="meta">${escapeHtml(graphInfo)}</p>
+  </div>
+
+  <div class="section">
+    <h3>Imported AI Context</h3>
+    <ul>${importedAI}</ul>
+  </div>
+
+  <div class="section">
+    <h3>Historical AI Decisions</h3>
+    <ul>${aiDecisions}</ul>
+  </div>
+
+  <div class="section">
+    <h3>AI-Derived Operational Risks</h3>
+    <ul>${aiRisks}</ul>
+  </div>
+
+  <div class="section">
+    <h3>AI Reasoning Summaries</h3>
+    <ul>${aiReasoning}</ul>
+  </div>
+
+  <div class="section">
+    <h3>AI Context Actions</h3>
+    <div class="toolbar">
+      <button data-command="axiom.importAIContext">Import AI Context</button>
+      <button data-command="axiom.refreshImportedContext">Refresh Imported Context</button>
+      <button data-command="axiom.compressAIConversations">Compress AI Conversations</button>
+      <button data-command="axiom.copyCombinedContext">Copy Combined Operational Context</button>
+    </div>
   </div>
 
   <div class="section">

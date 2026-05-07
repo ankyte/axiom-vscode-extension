@@ -15,7 +15,11 @@
     "onCommand:axiom.risks",
     "onCommand:axiom.why",
     "onCommand:axiom.copyContext",
+    "onCommand:axiom.copyCombinedContext",
     "onCommand:axiom.exportContext",
+    "onCommand:axiom.importAIContext",
+    "onCommand:axiom.refreshImportedContext",
+    "onCommand:axiom.compressAIConversations",
     "onView:axiom.sidebar"
   ],
   "scripts": {
@@ -30,7 +34,11 @@
       { "command": "axiom.risks", "title": "/axiom-risks" },
       { "command": "axiom.why", "title": "/axiom-why" },
       { "command": "axiom.copyContext", "title": "AXIOM: Copy AXIOM Context" },
-      { "command": "axiom.exportContext", "title": "AXIOM: Export Context" }
+      { "command": "axiom.copyCombinedContext", "title": "AXIOM: Copy Combined Operational Context" },
+      { "command": "axiom.exportContext", "title": "AXIOM: Export Context" },
+      { "command": "axiom.importAIContext", "title": "AXIOM: Import AI Context" },
+      { "command": "axiom.refreshImportedContext", "title": "AXIOM: Refresh Imported Context" },
+      { "command": "axiom.compressAIConversations", "title": "AXIOM: Compress AI Conversations" }
     ],
     "viewsContainers": {
       "activitybar": [

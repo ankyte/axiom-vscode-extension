@@ -32,6 +32,24 @@ export class RetrievalEngine {
       'KNOWN RISKS:',
       ...memory.risks.slice(0, 6).map((r) => `- ${r}`),
       ...memory.auditorFindings.slice(0, 4).map((f) => `- [${f.severity}] ${f.statement}`),
+      '',
+      'AI REASONING SUMMARIES:',
+      ...memory.aiReasoningSummaries.slice(0, 6).map((r) => `- ${r}`),
+    ].join('\n');
+  }
+
+  public combinedOperationalContext(memory: AxiomMemory): string {
+    return [
+      this.contextPack(memory),
+      '',
+      'HISTORICAL AI DECISIONS:',
+      ...memory.historicalAIDecisions.slice(0, 8).map((d) => `- ${d}`),
+      '',
+      'AI-DERIVED OPERATIONAL RISKS:',
+      ...memory.aiDerivedRisks.slice(0, 8).map((r) => `- ${r}`),
+      '',
+      'IMPORTED AI CONTEXT:',
+      ...memory.importedAIContext.slice(0, 8).map((c) => `- [${c.source}] ${c.what} | why: ${c.why} | impact: ${c.impact}`),
     ].join('\n');
   }
 }

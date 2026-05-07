@@ -1,12 +1,17 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { CopilotAdapter } from './adapters/copilotAdapter';
+import { WindsurfAdapter } from './adapters/windsurfAdapter';
+import { MarkdownAdapter } from './adapters/markdownAdapter';
 import { EngineeringAuditor } from './auditor';
 import { CavemanEngine } from './compression';
 import { RepositoryIngestion } from './ingestion';
 import { OpenAIClient } from './openaiClient';
 import { RetrievalEngine } from './retrieval';
 import { AxiomSidebarProvider } from './sidebar';
+import { AIContextIntegrationService } from './services/aiContextIntegrationService';
+import { IntentExtractionService } from './services/intentExtractionService';
 import { MemoryStore } from './storage';
 import { AxiomMemory, GraphEdge, GraphNode } from './types';
 import { hashId } from './utils';
@@ -18,6 +23,11 @@ export function activate(context: vscode.ExtensionContext): void {
   const store = new MemoryStore(context);
   const retrieval = new RetrievalEngine();
   const auditor = new EngineeringAuditor();
+  const intentExtraction = new IntentExtractionService();
+  const aiIntegration = new AIContextIntegrationService(compressor);
+
+  // Privacy: adapters run local-only scans; no telemetry or external upload.
+  const adapters = [new CopilotAdapter(), new WindsurfAdapter(), new MarkdownAdapter()];
 
   let memoryCache: AxiomMemory | null = null;
 
@@ -43,9 +53,16 @@ export function activate(context: vscode.ExtensionContext): void {
       return null;
     }
 
-    memoryCache = loaded;
+    memoryCache = normalizeMemory(loaded);
     sidebar.setMemory(memoryCache);
-    return loaded;
+    return memoryCache;
+  };
+
+  const saveAndRefresh = async (memory: AxiomMemory): Promise<void> => {
+    memory.auditorFindings = auditor.run(memory);
+    await store.save(memory);
+    memoryCache = memory;
+    sidebar.setMemory(memory);
   };
 
   const initialize = async (): Promise<void> => {
@@ -122,18 +139,85 @@ export function activate(context: vscode.ExtensionContext): void {
           keyDecisions,
           risks,
           auditorFindings: [],
+          importedAIContext: [],
+          historicalAIDecisions: [],
+          aiDerivedRisks: [],
+          aiReasoningSummaries: [],
         };
 
-        memory.auditorFindings = auditor.run(memory);
-
         progress.report({ increment: 25, message: 'Persisting memory' });
-        await store.save(memory);
-        memoryCache = memory;
-        sidebar.setMemory(memory);
+        await saveAndRefresh(memory);
       },
     );
 
     vscode.window.showInformationMessage('AXIOM operational memory initialized.');
+  };
+
+  const importAIContext = async (): Promise<void> => {
+    const memory = await ensureMemory();
+    if (!memory) return;
+    const folder = getWorkspaceFolder();
+    if (!folder) return;
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'AXIOM importing local AI context',
+        cancellable: false,
+      },
+      async (progress) => {
+        progress.report({ increment: 30, message: 'Scanning local chat sessions' });
+        const chunks = await adapters[0].extractChunks(300, folder.uri.fsPath);
+        if (chunks.length === 0) {
+          vscode.window.showInformationMessage('No relevant local Copilot conversation context found for this workspace.');
+          return;
+        }
+
+        progress.report({ increment: 30, message: 'Extracting engineering intent' });
+        const intents = intentExtraction.extract(chunks);
+        if (intents.length === 0) {
+          vscode.window.showInformationMessage('AI conversations were found, but no high-signal engineering intent matched this workspace.');
+          return;
+        }
+
+        progress.report({ increment: 40, message: 'Merging into operational memory' });
+        const merged = aiIntegration.merge(normalizeMemory(memory), intents);
+        await saveAndRefresh(merged);
+
+        vscode.window.showInformationMessage(`AXIOM imported ${intents.length} high-signal AI reasoning chunks from Copilot.`);
+      },
+    );
+  };
+
+  const refreshImportedContext = async (): Promise<void> => {
+    await importAIContext();
+  };
+
+  const compressAIConversations = async (): Promise<void> => {
+    const memory = await ensureMemory();
+    if (!memory) return;
+
+    if (normalizeMemory(memory).importedAIContext.length === 0) {
+      vscode.window.showInformationMessage('No imported AI context found. Run AXIOM: Import AI Context first.');
+      return;
+    }
+
+    const intents = normalizeMemory(memory).importedAIContext.map((item) => ({
+      id: item.id,
+      source: item.source,
+      sessionId: item.sessionId,
+      timestamp: item.timestamp,
+      what: item.what,
+      why: item.why,
+      impact: item.impact,
+      referencedFiles: item.referencedFiles,
+      relatedServices: item.relatedServices,
+      rawExcerpt: item.rawExcerpt,
+    }));
+
+    const merged = aiIntegration.merge(memory, intents);
+    await saveAndRefresh(merged);
+    vscode.window.showInformationMessage('AXIOM compressed imported AI conversations into memory summaries.');
   };
 
   const runTextCommand = async (command: 'context' | 'caveman' | 'summary' | 'risks' | 'why'): Promise<void> => {
@@ -164,6 +248,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (command === 'risks') {
       const riskLines = [
         ...memory.risks.slice(0, 12).map((r) => `- ${r}`),
+        ...memory.aiDerivedRisks.slice(0, 6).map((r) => `- [ai] ${r}`),
         ...memory.auditorFindings.map((f) => `- [${f.severity}] ${f.statement} (${f.evidence})`),
       ].join('\n');
       await vscode.workspace.openTextDocument({ content: `# AXIOM Operational Risks\n\n${riskLines}`, language: 'markdown' }).then(vscode.window.showTextDocument);
@@ -191,6 +276,14 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.showInformationMessage('AXIOM context copied to clipboard.');
   };
 
+  const copyCombinedContext = async (): Promise<void> => {
+    const memory = await ensureMemory();
+    if (!memory) return;
+    const pack = retrieval.combinedOperationalContext(memory);
+    await vscode.env.clipboard.writeText(pack);
+    vscode.window.showInformationMessage('Combined operational context copied.');
+  };
+
   const exportContext = async (): Promise<void> => {
     const memory = await ensureMemory();
     if (!memory) return;
@@ -198,7 +291,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const folder = getWorkspaceFolder();
     if (!folder) return;
 
-    const exported = retrieval.contextPack(memory);
+    const exported = retrieval.combinedOperationalContext(memory);
     const exportDir = path.join(folder.uri.fsPath, '.axiom');
     const exportPath = path.join(exportDir, `axiom-context-${hashId(new Date().toISOString())}.md`);
     await fs.mkdir(exportDir, { recursive: true });
@@ -229,8 +322,20 @@ export function activate(context: vscode.ExtensionContext): void {
       case 'axiom.copyContext':
         await copyContext();
         break;
+      case 'axiom.copyCombinedContext':
+        await copyCombinedContext();
+        break;
       case 'axiom.exportContext':
         await exportContext();
+        break;
+      case 'axiom.importAIContext':
+        await importAIContext();
+        break;
+      case 'axiom.refreshImportedContext':
+        await refreshImportedContext();
+        break;
+      case 'axiom.compressAIConversations':
+        await compressAIConversations();
         break;
       default:
         break;
@@ -247,7 +352,11 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('axiom.risks', () => runTextCommand('risks')),
     vscode.commands.registerCommand('axiom.why', () => runTextCommand('why')),
     vscode.commands.registerCommand('axiom.copyContext', copyContext),
+    vscode.commands.registerCommand('axiom.copyCombinedContext', copyCombinedContext),
     vscode.commands.registerCommand('axiom.exportContext', exportContext),
+    vscode.commands.registerCommand('axiom.importAIContext', importAIContext),
+    vscode.commands.registerCommand('axiom.refreshImportedContext', refreshImportedContext),
+    vscode.commands.registerCommand('axiom.compressAIConversations', compressAIConversations),
     vscode.commands.registerCommand('/axiom-context', () => runTextCommand('context')),
     vscode.commands.registerCommand('/axiom-caveman', () => runTextCommand('caveman')),
     vscode.commands.registerCommand('/axiom-summary', () => runTextCommand('summary')),
@@ -257,3 +366,13 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {}
+
+function normalizeMemory(memory: AxiomMemory): AxiomMemory {
+  return {
+    ...memory,
+    importedAIContext: memory.importedAIContext ?? [],
+    historicalAIDecisions: memory.historicalAIDecisions ?? [],
+    aiDerivedRisks: memory.aiDerivedRisks ?? [],
+    aiReasoningSummaries: memory.aiReasoningSummaries ?? [],
+  };
+}

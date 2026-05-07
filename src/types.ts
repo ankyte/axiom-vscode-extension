@@ -28,7 +28,7 @@ export interface PRInsight {
 export interface CompressedSummary {
   id: string;
   level: SummaryLevel;
-  sourceType: 'file' | 'commit' | 'module' | 'repo';
+  sourceType: 'file' | 'commit' | 'module' | 'repo' | 'ai_context';
   sourceId: string;
   text: string;
   intent: string;
@@ -39,7 +39,7 @@ export interface CompressedSummary {
 
 export interface GraphNode {
   id: string;
-  type: 'file' | 'commit' | 'service' | 'summary';
+  type: 'file' | 'commit' | 'service' | 'summary' | 'ai_context';
   label: string;
   meta?: Record<string, string>;
 }
@@ -78,4 +78,19 @@ export interface AxiomMemory {
   keyDecisions: string[];
   risks: string[];
   auditorFindings: RiskAuditFinding[];
+  importedAIContext: {
+    id: string;
+    source: 'copilot' | 'windsurf' | 'markdown';
+    sessionId: string;
+    timestamp: string;
+    what: string;
+    why: string;
+    impact: string;
+    referencedFiles: string[];
+    relatedServices: string[];
+    rawExcerpt: string;
+  }[];
+  historicalAIDecisions: string[];
+  aiDerivedRisks: string[];
+  aiReasoningSummaries: string[];
 }

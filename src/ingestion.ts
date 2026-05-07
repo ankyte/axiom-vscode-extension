@@ -153,7 +153,13 @@ export class RepositoryIngestion {
     const files: string[] = [];
 
     for (const entry of entries) {
-      if (entry.name.startsWith('.git') || entry.name === 'node_modules' || entry.name === 'out' || entry.name === 'dist') {
+      if (
+        entry.name.startsWith('.git') ||
+        entry.name === 'node_modules' ||
+        entry.name === 'out' ||
+        entry.name === 'dist' ||
+        entry.name === '.axiom'
+      ) {
         continue;
       }
       const full = path.join(current, entry.name);

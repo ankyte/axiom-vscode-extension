@@ -4,17 +4,39 @@ AXIOM stands for **AXIOM eXtracts Intent from Operational Memory**.
 
 Git stores code. AXIOM stores understanding.
 
-AXIOM is context infrastructure for AI-assisted development. It ingests repository history, compresses engineering intent into high-signal summaries, and exports portable context you can paste into Copilot, Claude, ChatGPT, Windsurf, or any assistant.
+AXIOM is local-first context infrastructure for AI-assisted development. It ingests repository behavior and AI-assisted reasoning, compresses intent into operational memory, and exports portable context for any assistant.
 
-## MVP Features
+## Core MVP
 
-1. Repository ingestion (`AXIOM: Initialize Repository`)
-2. Hierarchical context compression (Caveman Engine)
-3. Operational memory store (local JSON + graph + lightweight vectors)
-4. Context retrieval (`/axiom-context`, `/axiom-caveman`, `/axiom-summary`, `/axiom-risks`, `/axiom-why`)
-5. AI context export (`Copy AXIOM Context`, `Export Context`)
-6. Monochrome sidebar with operational sections
-7. AI engineering auditor heuristics
+- Repository ingestion
+- Hierarchical compression (Caveman, Developer, System)
+- Operational memory store (JSON + graph + lightweight vectors)
+- Retrieval commands
+- Context export
+- Engineering auditor
+
+## New Feature: AI Chat Context Adapters
+
+AXIOM can now import local AI conversation context and convert it into operational memory.
+
+Implemented:
+
+- Adapter architecture under `src/adapters/`
+- Full `CopilotAdapter` (local workspaceStorage scan, resilient JSON/JSONL parsing)
+- `WindsurfAdapter` scaffold
+- `MarkdownAdapter` scaffold
+- Intent extraction service (`WHAT`, `WHY`, `IMPACT`)
+- Merge into AXIOM summaries, graph, decisions, and risks
+- Sidebar sections for imported AI reasoning
+- Combined context export for external assistants
+
+Privacy behavior:
+
+- Local-first only
+- Explicit command-triggered import
+- No telemetry
+- No cloud sync
+- No conversation upload
 
 ## Commands
 
@@ -25,49 +47,24 @@ AXIOM is context infrastructure for AI-assisted development. It ingests reposito
 - `/axiom-risks`
 - `/axiom-why`
 - `AXIOM: Copy AXIOM Context`
+- `AXIOM: Copy Combined Operational Context`
 - `AXIOM: Export Context`
+- `AXIOM: Import AI Context`
+- `AXIOM: Refresh Imported Context`
+- `AXIOM: Compress AI Conversations`
 
-## How It Works
+## Sidebar Sections
 
-### 1) Ingestion
-
-- Scans important repository files
-- Reads recent git commits
-- Loads mock PR summaries from `.axiom/pr-summaries.json` or bundled sample data
-- Builds initial architecture and risk signals
-
-### 2) Caveman Engine Compression
-
-Creates three levels:
-
+- Project Overview
 - Caveman Summary
-- Developer Summary
-- System Summary
-
-Pipeline:
-
-- summarize files
-- summarize commits
-- summarize services/modules
-- recursively compress for repository-level understanding
-
-### 3) Operational Memory
-
-Persisted in VS Code global storage as local JSON.
-
-Contains:
-
-- architecture snapshot
-- file insights
-- commit insights
-- PR insights
-- compressed summaries
-- graph nodes and edges (`affects`, `introduced_by`, `related_to`)
-- risk and auditor findings
-
-### 4) Retrieval + Export
-
-Retrieval queries are vector-matched against compressed summaries (not raw code). Export composes a compact high-signal prompt pack for external AI tools.
+- Key Decisions
+- Operational Risks
+- Recent Changes
+- Context Graph
+- Imported AI Context
+- Historical AI Decisions
+- AI-Derived Operational Risks
+- AI Reasoning Summaries
 
 ## Setup
 
@@ -77,38 +74,34 @@ Retrieval queries are vector-matched against compressed summaries (not raw code)
 npm install
 ```
 
-2. Compile extension:
+2. Compile:
 
 ```bash
 npm run compile
 ```
 
-3. Open this project in VS Code and press `F5` to launch Extension Development Host.
+3. Press `F5` in VS Code to run Extension Development Host.
 
-4. In target repository:
+4. In a target repository:
 
 - Run `AXIOM: Initialize Repository`
-- Run `/axiom-context`
-- Use sidebar buttons for copy/export
+- Run `AXIOM: Import AI Context`
+- Run `AXIOM: Copy Combined Operational Context`
 
-## OpenAI API (Optional)
+## Copilot Source Discovery
 
-AXIOM works without API access using deterministic local compression. To improve summaries, set:
+AXIOM scans default VS Code workspace storage locations:
 
-```bash
-export OPENAI_API_KEY=your_key_here
-```
+- Windows: `%APPDATA%/Code/User/workspaceStorage/`
+- macOS: `~/Library/Application Support/Code/User/workspaceStorage/`
+- Linux: `~/.config/Code/User/workspaceStorage/`
 
-When key is present, AXIOM attempts concise summary calls through OpenAI Responses API.
+Then it looks for `chatSessions` folders and parses `.json` / `.jsonl` session files.
 
-## Demo Flow
+## Mocked Sample Data
 
-1. Open unfamiliar repository
-2. Run `/axiom-context`
-3. Review architecture, decisions, risks, recent changes
-4. Click `Copy AXIOM Context`
-5. Paste into external AI assistant
-6. Show improved reasoning with operational memory
+- Mock PR summaries: `src/mock-data/pr-summaries.json`
+- Mock chat sessions: `src/mock-data/copilot-sessions/sample-session.jsonl`
 
 ## Architecture Diagram
 
