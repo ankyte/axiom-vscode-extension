@@ -1,0 +1,1 @@
+{"version":3,"file":"windsurfAdapter.js","sourceRoot":"","sources":["../../src/adapters/windsurfAdapter.ts"],"names":[],"mappings":";;;AAEA,MAAa,eAAe;IAA5B;QACkB,WAAM,GAAG,UAAmB,CAAC;IAS/C,CAAC;IAPQ,KAAK,CAAC,gBAAgB;QAC3B,OAAO,EAAE,CAAC;IACZ,CAAC;IAEM,KAAK,CAAC,aAAa,CAAC,MAAM,GAAG,GAAG,EAAE,cAAuB;QAC9D,OAAO,EAAE,CAAC;IACZ,CAAC;CACF;AAVD,0CAUC"}

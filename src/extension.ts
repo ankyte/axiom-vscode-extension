@@ -15,6 +15,8 @@ import { IntentExtractionService } from './services/intentExtractionService';
 import { MemoryStore } from './storage';
 import { AxiomMemory, GraphEdge, GraphNode } from './types';
 import { hashId } from './utils';
+import { AxiomKernel } from './core/AxiomKernel';
+import { AxiomBackendApi } from './vscode/AxiomBackendApi';
 
 export function activate(context: vscode.ExtensionContext): void {
   const ai = new OpenAIClient();
@@ -25,6 +27,11 @@ export function activate(context: vscode.ExtensionContext): void {
   const auditor = new EngineeringAuditor();
   const intentExtraction = new IntentExtractionService();
   const aiIntegration = new AIContextIntegrationService(compressor);
+  const axiomKernel = new AxiomKernel({
+    storageRoot: context.globalStorageUri.fsPath,
+    workspaceRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+  });
+  const axiomApi = new AxiomBackendApi(axiomKernel);
 
   // Privacy: adapters run local-only scans; no telemetry or external upload.
   const adapters = [new CopilotAdapter(), new WindsurfAdapter(), new MarkdownAdapter()];
@@ -150,6 +157,9 @@ export function activate(context: vscode.ExtensionContext): void {
       },
     );
 
+    await axiomKernel.connectRepository(path.basename(folder.uri.fsPath));
+    await axiomKernel.connectRepository('pricing-service');
+    sidebar.refresh();
     vscode.window.showInformationMessage('AXIOM operational memory initialized.');
   };
 
@@ -299,6 +309,24 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.showInformationMessage(`AXIOM context exported: ${path.relative(folder.uri.fsPath, exportPath)}`);
   };
 
+  const connectRepository = async (): Promise<void> => {
+    const repoName = await vscode.window.showInputBox({
+      prompt: 'Connect repository to AXIOM organizational memory',
+      value: 'pricing-service',
+    });
+    if (!repoName) return;
+    await axiomKernel.connectRepository(repoName.trim());
+    sidebar.refresh();
+    vscode.window.showInformationMessage(`AXIOM connected ${repoName.trim()} and indexed repository memory.`);
+  };
+
+  const simulateActivity = async (): Promise<void> => {
+    await axiomKernel.ingestLocalCommit('Local retry guard updated after TODO review', hashId(new Date().toISOString()), 'local/hackathon');
+    await axiomKernel.simulateRemotePoll();
+    sidebar.refresh();
+    vscode.window.showInformationMessage('AXIOM simulated local commit sync and Azure DevOps polling.');
+  };
+
   const sidebar = new AxiomSidebarProvider(context.extensionUri, async (command) => {
     switch (command) {
       case 'axiom.initialize':
@@ -337,12 +365,47 @@ export function activate(context: vscode.ExtensionContext): void {
       case 'axiom.compressAIConversations':
         await compressAIConversations();
         break;
+      case 'axiom.connectRepository':
+        await connectRepository();
+        break;
+      case 'axiom.simulateActivity':
+        await simulateActivity();
+        break;
       default:
         break;
     }
+  }, (tab, activeFile) => axiomApi.getTabData(tab, activeFile));
+
+  void axiomKernel.bootstrap().then(() => {
+    axiomKernel.startPolling();
+    sidebar.refresh();
   });
 
   context.subscriptions.push(vscode.window.registerWebviewViewProvider(AxiomSidebarProvider.viewType, sidebar));
+  context.subscriptions.push({ dispose: () => axiomKernel.dispose() });
+
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor) {
+        const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const rel = folder ? path.relative(folder, editor.document.fileName) : path.basename(editor.document.fileName);
+        sidebar.updateActiveFile(rel);
+        void axiomKernel.recordActiveFile(rel).then(() => sidebar.refresh());
+      } else {
+        sidebar.updateActiveFile('No file selected');
+      }
+    })
+  );
+
+  // Send initial file if available
+  setTimeout(() => {
+    if (vscode.window.activeTextEditor) {
+      const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const rel = folder ? path.relative(folder, vscode.window.activeTextEditor.document.fileName) : path.basename(vscode.window.activeTextEditor.document.fileName);
+      sidebar.updateActiveFile(rel);
+      void axiomKernel.recordActiveFile(rel).then(() => sidebar.refresh());
+    }
+  }, 1000);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('axiom.initialize', initialize),
@@ -357,6 +420,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('axiom.importAIContext', importAIContext),
     vscode.commands.registerCommand('axiom.refreshImportedContext', refreshImportedContext),
     vscode.commands.registerCommand('axiom.compressAIConversations', compressAIConversations),
+    vscode.commands.registerCommand('axiom.connectRepository', connectRepository),
+    vscode.commands.registerCommand('axiom.simulateActivity', simulateActivity),
     vscode.commands.registerCommand('/axiom-context', () => runTextCommand('context')),
     vscode.commands.registerCommand('/axiom-caveman', () => runTextCommand('caveman')),
     vscode.commands.registerCommand('/axiom-summary', () => runTextCommand('summary')),

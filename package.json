@@ -20,6 +20,8 @@
     "onCommand:axiom.importAIContext",
     "onCommand:axiom.refreshImportedContext",
     "onCommand:axiom.compressAIConversations",
+    "onCommand:axiom.connectRepository",
+    "onCommand:axiom.simulateActivity",
     "onView:axiom.sidebar"
   ],
   "scripts": {
@@ -38,7 +40,9 @@
       { "command": "axiom.exportContext", "title": "AXIOM: Export Context" },
       { "command": "axiom.importAIContext", "title": "AXIOM: Import AI Context" },
       { "command": "axiom.refreshImportedContext", "title": "AXIOM: Refresh Imported Context" },
-      { "command": "axiom.compressAIConversations", "title": "AXIOM: Compress AI Conversations" }
+      { "command": "axiom.compressAIConversations", "title": "AXIOM: Compress AI Conversations" },
+      { "command": "axiom.connectRepository", "title": "AXIOM: Connect Repository" },
+      { "command": "axiom.simulateActivity", "title": "AXIOM: Simulate Memory Activity" }
     ],
     "viewsContainers": {
       "activitybar": [
