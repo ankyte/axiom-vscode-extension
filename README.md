@@ -7,6 +7,9 @@ AXIOM is a realtime organizational memory system that continuously captures, com
 
 Instead of relying on documentation that becomes stale, AXIOM passively observes engineering activity and builds a continuously evolving memory layer for both developers and AI systems.
 
+
+
+<img width="6767" height="6015" alt="Engineering Signal-2026-05-12-232045" src="https://github.com/user-attachments/assets/ccabba27-9144-48ae-a4ff-04c7fac10705" />
 ---
 
 # Vision
