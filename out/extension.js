@@ -105,7 +105,7 @@ function activate(context) {
             return;
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: 'AXIOM is extracting operational memory',
+            title: 'AXIOM is extracting organizational memory',
             cancellable: false,
         }, async (progress) => {
             progress.report({ increment: 20, message: 'Ingesting repository' });
@@ -173,7 +173,7 @@ function activate(context) {
         await axiomKernel.connectRepository(path.basename(folder.uri.fsPath));
         await axiomKernel.connectRepository('pricing-service');
         sidebar.refresh();
-        vscode.window.showInformationMessage('AXIOM operational memory initialized.');
+        vscode.window.showInformationMessage('AXIOM organizational memory initialized.');
     };
     const importAIContext = async () => {
         const memory = await ensureMemory();
@@ -199,7 +199,7 @@ function activate(context) {
                 vscode.window.showInformationMessage('AI conversations were found, but no high-signal engineering intent matched this workspace.');
                 return;
             }
-            progress.report({ increment: 40, message: 'Merging into operational memory' });
+            progress.report({ increment: 40, message: 'Merging into organizational memory' });
             const merged = aiIntegration.merge(normalizeMemory(memory), intents);
             await saveAndRefresh(merged);
             vscode.window.showInformationMessage(`AXIOM imported ${intents.length} high-signal AI reasoning chunks from Copilot.`);
@@ -289,7 +289,7 @@ function activate(context) {
             return;
         const pack = retrieval.combinedOperationalContext(memory);
         await vscode.env.clipboard.writeText(pack);
-        vscode.window.showInformationMessage('Combined operational context copied.');
+        vscode.window.showInformationMessage('Combined organizational context copied.');
     };
     const exportContext = async () => {
         const memory = await ensureMemory();
@@ -304,6 +304,33 @@ function activate(context) {
         await fs.mkdir(exportDir, { recursive: true });
         await fs.writeFile(exportPath, exported, 'utf8');
         vscode.window.showInformationMessage(`AXIOM context exported: ${path.relative(folder.uri.fsPath, exportPath)}`);
+    };
+    const activeFileForAxiom = () => {
+        const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const editor = vscode.window.activeTextEditor;
+        if (!editor)
+            return undefined;
+        return folder ? path.relative(folder, editor.document.fileName) : path.basename(editor.document.fileName);
+    };
+    const copyAxiomAIPacket = async () => {
+        const pack = await axiomApi.getAIContextMarkdown(activeFileForAxiom());
+        await vscode.env.clipboard.writeText(pack);
+        vscode.window.showInformationMessage('AXIOM AI packet copied from live retrieval context.');
+    };
+    const exportAxiomAIPacket = async () => {
+        const folder = getWorkspaceFolder();
+        if (!folder)
+            return;
+        const exported = await axiomApi.getAIContextMarkdown(activeFileForAxiom());
+        const exportDir = path.join(folder.uri.fsPath, '.axiom');
+        const exportPath = path.join(exportDir, `axiom-ai-packet-${(0, utils_1.hashId)(new Date().toISOString())}.md`);
+        await fs.mkdir(exportDir, { recursive: true });
+        await fs.writeFile(exportPath, exported, 'utf8');
+        vscode.window.showInformationMessage(`AXIOM AI packet exported: ${path.relative(folder.uri.fsPath, exportPath)}`);
+    };
+    const compareAxiomContext = async () => {
+        const comparison = await axiomApi.getAIComparisonMarkdown(activeFileForAxiom());
+        await vscode.workspace.openTextDocument({ content: comparison, language: 'markdown' }).then(vscode.window.showTextDocument);
     };
     const connectRepository = async () => {
         const repoName = await vscode.window.showInputBox({
@@ -321,6 +348,11 @@ function activate(context) {
         await axiomKernel.simulateRemotePoll();
         sidebar.refresh();
         vscode.window.showInformationMessage('AXIOM simulated local commit sync and Azure DevOps polling.');
+    };
+    const refreshLocalSignals = async () => {
+        await axiomKernel.refreshLocalSignals();
+        sidebar.refresh();
+        vscode.window.showInformationMessage('AXIOM refreshed local commits, architecture files, dependencies, and logs.');
     };
     const sidebar = new sidebar_1.AxiomSidebarProvider(context.extensionUri, async (command) => {
         switch (command) {
@@ -351,6 +383,15 @@ function activate(context) {
             case 'axiom.exportContext':
                 await exportContext();
                 break;
+            case 'axiom.copyAIPacket':
+                await copyAxiomAIPacket();
+                break;
+            case 'axiom.exportAIPacket':
+                await exportAxiomAIPacket();
+                break;
+            case 'axiom.compareAIPacket':
+                await compareAxiomContext();
+                break;
             case 'axiom.importAIContext':
                 await importAIContext();
                 break;
@@ -366,16 +407,41 @@ function activate(context) {
             case 'axiom.simulateActivity':
                 await simulateActivity();
                 break;
+            case 'axiom.refreshLocalSignals':
+                await refreshLocalSignals();
+                break;
             default:
                 break;
         }
     }, (tab, activeFile) => axiomApi.getTabData(tab, activeFile));
     void axiomKernel.bootstrap().then(() => {
-        axiomKernel.startPolling();
+        axiomKernel.startPolling(30000, () => sidebar.refresh());
         sidebar.refresh();
     });
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(sidebar_1.AxiomSidebarProvider.viewType, sidebar));
     context.subscriptions.push({ dispose: () => axiomKernel.dispose() });
+    const changedFiles = new Map();
+    const watchLocalFile = (uri) => {
+        const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!folder)
+            return;
+        const rel = path.relative(folder, uri.fsPath);
+        if (rel.startsWith('node_modules') || rel.startsWith('out') || rel.startsWith('.git'))
+            return;
+        const current = changedFiles.get(rel);
+        if (current)
+            clearTimeout(current);
+        changedFiles.set(rel, setTimeout(() => {
+            changedFiles.delete(rel);
+            void axiomKernel.ingestLocalFileChange(rel).then(() => sidebar.refresh());
+        }, 750));
+    };
+    const watcher = vscode.workspace.createFileSystemWatcher('**/{package.json,package-lock.json,README.md,architecture.md,*.log,*.md,*.ts,*.tsx,*.js,*.json}');
+    context.subscriptions.push(watcher, watcher.onDidCreate(watchLocalFile), watcher.onDidChange(watchLocalFile), watcher.onDidDelete((uri) => {
+        const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const rel = folder ? path.relative(folder, uri.fsPath) : path.basename(uri.fsPath);
+        void axiomKernel.ingestLocalCommit(`Local file deleted: ${rel}`, (0, utils_1.hashId)(`delete:${rel}:${Date.now()}`), 'local/delete').then(() => sidebar.refresh());
+    }));
     context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
         if (editor) {
             const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -396,7 +462,7 @@ function activate(context) {
             void axiomKernel.recordActiveFile(rel).then(() => sidebar.refresh());
         }
     }, 1000);
-    context.subscriptions.push(vscode.commands.registerCommand('axiom.initialize', initialize), vscode.commands.registerCommand('axiom.context', () => runTextCommand('context')), vscode.commands.registerCommand('axiom.caveman', () => runTextCommand('caveman')), vscode.commands.registerCommand('axiom.summary', () => runTextCommand('summary')), vscode.commands.registerCommand('axiom.risks', () => runTextCommand('risks')), vscode.commands.registerCommand('axiom.why', () => runTextCommand('why')), vscode.commands.registerCommand('axiom.copyContext', copyContext), vscode.commands.registerCommand('axiom.copyCombinedContext', copyCombinedContext), vscode.commands.registerCommand('axiom.exportContext', exportContext), vscode.commands.registerCommand('axiom.importAIContext', importAIContext), vscode.commands.registerCommand('axiom.refreshImportedContext', refreshImportedContext), vscode.commands.registerCommand('axiom.compressAIConversations', compressAIConversations), vscode.commands.registerCommand('axiom.connectRepository', connectRepository), vscode.commands.registerCommand('axiom.simulateActivity', simulateActivity), vscode.commands.registerCommand('/axiom-context', () => runTextCommand('context')), vscode.commands.registerCommand('/axiom-caveman', () => runTextCommand('caveman')), vscode.commands.registerCommand('/axiom-summary', () => runTextCommand('summary')), vscode.commands.registerCommand('/axiom-risks', () => runTextCommand('risks')), vscode.commands.registerCommand('/axiom-why', () => runTextCommand('why')));
+    context.subscriptions.push(vscode.commands.registerCommand('axiom.initialize', initialize), vscode.commands.registerCommand('axiom.context', () => runTextCommand('context')), vscode.commands.registerCommand('axiom.caveman', () => runTextCommand('caveman')), vscode.commands.registerCommand('axiom.summary', () => runTextCommand('summary')), vscode.commands.registerCommand('axiom.risks', () => runTextCommand('risks')), vscode.commands.registerCommand('axiom.why', () => runTextCommand('why')), vscode.commands.registerCommand('axiom.copyContext', copyContext), vscode.commands.registerCommand('axiom.copyCombinedContext', copyCombinedContext), vscode.commands.registerCommand('axiom.exportContext', exportContext), vscode.commands.registerCommand('axiom.copyAIPacket', copyAxiomAIPacket), vscode.commands.registerCommand('axiom.exportAIPacket', exportAxiomAIPacket), vscode.commands.registerCommand('axiom.compareAIPacket', compareAxiomContext), vscode.commands.registerCommand('axiom.importAIContext', importAIContext), vscode.commands.registerCommand('axiom.refreshImportedContext', refreshImportedContext), vscode.commands.registerCommand('axiom.compressAIConversations', compressAIConversations), vscode.commands.registerCommand('axiom.connectRepository', connectRepository), vscode.commands.registerCommand('axiom.simulateActivity', simulateActivity), vscode.commands.registerCommand('axiom.refreshLocalSignals', refreshLocalSignals), vscode.commands.registerCommand('/axiom-context', () => runTextCommand('context')), vscode.commands.registerCommand('/axiom-caveman', () => runTextCommand('caveman')), vscode.commands.registerCommand('/axiom-summary', () => runTextCommand('summary')), vscode.commands.registerCommand('/axiom-risks', () => runTextCommand('risks')), vscode.commands.registerCommand('/axiom-why', () => runTextCommand('why')));
 }
 function deactivate() { }
 function normalizeMemory(memory) {

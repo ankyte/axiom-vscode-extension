@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { ArchitectureRuleProvider } from '../architecture/ArchitectureRuleProvider';
 import { SemanticCompressionEngine } from '../compression/SemanticCompressionEngine';
 import { RelationshipEngine, MemoryGraph } from '../graph/RelationshipEngine';
 import { IngestionPipeline } from '../ingestion/IngestionPipeline';
@@ -37,7 +38,8 @@ export class AxiomKernel {
   private readonly embeddings: IEmbeddingProvider;
   private readonly llm: ILLMProvider;
   private readonly relationships = new RelationshipEngine();
-  private readonly localSignals = new LocalSignalCollector();
+  private readonly localSignals: LocalSignalCollector;
+  private readonly ruleProvider: ArchitectureRuleProvider;
   private readonly remoteSignals: RemoteSignalMapper;
   private readonly pipeline: IngestionPipeline;
   private readonly retrieval: ContextRetrievalEngine;
@@ -45,6 +47,9 @@ export class AxiomKernel {
   private readonly workspaceRoot?: string;
   private activeContext: RetrievalContext;
   private poller?: NodeJS.Timeout;
+  private lastLocalIngestAt?: string;
+  private lastRemotePollAt?: string;
+  private lastRuleRefreshAt?: string;
 
   constructor(options: AxiomKernelOptions) {
     this.azure = options.azure ?? new MockAzureDevOpsProvider();
@@ -52,6 +57,8 @@ export class AxiomKernel {
     this.embeddings = options.embeddings ?? new MockEmbeddingProvider();
     this.llm = options.llm ?? new MockLLMProvider();
     this.workspaceRoot = options.workspaceRoot;
+    this.localSignals = new LocalSignalCollector(options.storageRoot);
+    this.ruleProvider = new ArchitectureRuleProvider(this.store, this.workspaceRoot);
     const defaultRepo = options.workspaceRoot ? path.basename(options.workspaceRoot) : 'pricing-service';
     this.activeContext = { repo: defaultRepo };
     this.remoteSignals = new RemoteSignalMapper(this.azure);
@@ -65,6 +72,10 @@ export class AxiomKernel {
       new DriftDetectionEngine(),
       new TimelineEngine(),
       (repo) => this.azure.getRepositoryConnections(repo),
+      (repo) => this.ruleProvider.getRules(repo).then((rules) => {
+        this.lastRuleRefreshAt = rules.loadedAt;
+        return rules;
+      }),
     );
   }
 
@@ -78,10 +89,10 @@ export class AxiomKernel {
     }
   }
 
-  public startPolling(intervalMs = 45_000): void {
+  public startPolling(intervalMs = 30_000, onPoll?: () => void | Promise<void>): void {
     if (this.poller) return;
     this.poller = setInterval(() => {
-      void this.simulateRemotePoll();
+      void this.simulateRemotePoll().then(() => onPoll?.());
     }, intervalMs);
   }
 
@@ -95,6 +106,8 @@ export class AxiomKernel {
     const remote = await this.remoteSignals.fromRepository(repoName);
     const local = this.workspaceRoot ? await this.localSignals.collect(this.workspaceRoot, repoName) : [];
     await this.pipeline.ingest([...remote, ...local]);
+    this.lastLocalIngestAt = local.length ? new Date().toISOString() : this.lastLocalIngestAt;
+    this.lastRemotePollAt = remote.length ? new Date().toISOString() : this.lastRemotePollAt;
     await this.indexRepositoryRelationships(repoName);
   }
 
@@ -102,10 +115,26 @@ export class AxiomKernel {
     const repo = this.activeContext.repo;
     this.activeContext = { ...this.activeContext, file: filePath };
     await this.pipeline.ingest([this.localSignals.fileOpened(repo, filePath)]);
+    this.lastLocalIngestAt = new Date().toISOString();
   }
 
   public async ingestLocalCommit(message: string, commitId = hashId(`${message}:${Date.now()}`), branch = 'local'): Promise<void> {
     await this.pipeline.ingest([this.localSignals.localCommit(this.activeContext.repo, message, commitId, branch)]);
+    this.lastLocalIngestAt = new Date().toISOString();
+  }
+
+  public async ingestLocalFileChange(filePath: string): Promise<void> {
+    if (!this.workspaceRoot) return;
+    const signals = await this.localSignals.fileChanged(this.workspaceRoot, this.activeContext.repo, filePath);
+    await this.pipeline.ingest(signals);
+    if (signals.length) this.lastLocalIngestAt = new Date().toISOString();
+  }
+
+  public async refreshLocalSignals(): Promise<void> {
+    if (!this.workspaceRoot) return;
+    const signals = await this.localSignals.collect(this.workspaceRoot, this.activeContext.repo);
+    await this.pipeline.ingest(signals);
+    if (signals.length) this.lastLocalIngestAt = new Date().toISOString();
   }
 
   public async handlePullRequestMerged(repo: string, pullRequestId: string): Promise<void> {
@@ -122,6 +151,8 @@ export class AxiomKernel {
     for (const repo of this.connectedRepos) {
       await this.pipeline.ingest(await this.remoteSignals.fromRepository(repo));
     }
+    this.lastRemotePollAt = new Date().toISOString();
+    await this.refreshLocalSignals();
   }
 
   public async retrieve(context: Partial<RetrievalContext> = {}): Promise<ContextRetrievalResult> {
@@ -149,6 +180,15 @@ export class AxiomKernel {
 
   public async getMemories(repo = this.activeContext.repo): Promise<MemoryRecord[]> {
     return this.store.getMemories({ repo });
+  }
+
+  public getStatus(): { connectedRepositories: string[]; lastLocalIngestAt?: string; lastRemotePollAt?: string; lastRuleRefreshAt?: string } {
+    return {
+      connectedRepositories: this.getConnectedRepositories(),
+      lastLocalIngestAt: this.lastLocalIngestAt,
+      lastRemotePollAt: this.lastRemotePollAt,
+      lastRuleRefreshAt: this.lastRuleRefreshAt,
+    };
   }
 
   private async indexRepositoryRelationships(repoName: string): Promise<void> {

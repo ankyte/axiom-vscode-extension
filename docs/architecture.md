@@ -18,7 +18,7 @@ flowchart TD
   C --> C2[Developer Summaries]
   C --> C3[System Summaries]
 
-  C --> D[Operational Memory Store]
+  C --> D[Organizational Memory Store]
   D --> D1[Local JSON Persistence]
   D --> D2[Vector Index]
   D --> D3[Graph Nodes and Edges]

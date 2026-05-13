@@ -75,7 +75,7 @@ class MockLLMProvider {
             return 'avoid reopening the regression that forced rollback';
         if (lower.includes('architecture'))
             return 'keep implementation aligned with declared architecture';
-        return 'preserve operational context while changing code';
+        return 'preserve organizational context while changing code';
     }
     async generateContextPacket(memories) {
         // TODO: REAL ROCKAI IMPLEMENTATION HERE

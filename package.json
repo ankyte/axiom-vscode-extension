@@ -1,7 +1,7 @@
 {
   "name": "axiom",
   "displayName": "AXIOM",
-  "description": "AXIOM eXtracts Intent from Operational Memory",
+  "description": "AXIOM eXtracts Intent from Organizational Memory",
   "version": "1.0.0",
   "main": "./out/extension.js",
   "engines": {
@@ -17,11 +17,15 @@
     "onCommand:axiom.copyContext",
     "onCommand:axiom.copyCombinedContext",
     "onCommand:axiom.exportContext",
+    "onCommand:axiom.copyAIPacket",
+    "onCommand:axiom.exportAIPacket",
+    "onCommand:axiom.compareAIPacket",
     "onCommand:axiom.importAIContext",
     "onCommand:axiom.refreshImportedContext",
     "onCommand:axiom.compressAIConversations",
     "onCommand:axiom.connectRepository",
     "onCommand:axiom.simulateActivity",
+    "onCommand:axiom.refreshLocalSignals",
     "onView:axiom.sidebar"
   ],
   "scripts": {
@@ -36,13 +40,17 @@
       { "command": "axiom.risks", "title": "/axiom-risks" },
       { "command": "axiom.why", "title": "/axiom-why" },
       { "command": "axiom.copyContext", "title": "AXIOM: Copy AXIOM Context" },
-      { "command": "axiom.copyCombinedContext", "title": "AXIOM: Copy Combined Operational Context" },
+      { "command": "axiom.copyCombinedContext", "title": "AXIOM: Copy Combined Organizational Context" },
       { "command": "axiom.exportContext", "title": "AXIOM: Export Context" },
+      { "command": "axiom.copyAIPacket", "title": "AXIOM: Copy AI Context Packet" },
+      { "command": "axiom.exportAIPacket", "title": "AXIOM: Export AI Context Packet" },
+      { "command": "axiom.compareAIPacket", "title": "AXIOM: Compare Raw vs AI Packet" },
       { "command": "axiom.importAIContext", "title": "AXIOM: Import AI Context" },
       { "command": "axiom.refreshImportedContext", "title": "AXIOM: Refresh Imported Context" },
       { "command": "axiom.compressAIConversations", "title": "AXIOM: Compress AI Conversations" },
       { "command": "axiom.connectRepository", "title": "AXIOM: Connect Repository" },
-      { "command": "axiom.simulateActivity", "title": "AXIOM: Simulate Memory Activity" }
+      { "command": "axiom.simulateActivity", "title": "AXIOM: Simulate Memory Activity" },
+      { "command": "axiom.refreshLocalSignals", "title": "AXIOM: Refresh Local Signals" }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -57,7 +65,7 @@
       "axiom": [
         {
           "id": "axiom.sidebar",
-          "name": "Operational Memory",
+          "name": "Organizational Memory",
           "type": "webview"
         }
       ]

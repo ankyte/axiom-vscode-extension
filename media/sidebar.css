@@ -340,6 +340,15 @@ body {
 }
 
 /* Graph */
+.graph-empty {
+  background: var(--axiom-bg-card);
+  border: 1px solid var(--axiom-border);
+  border-radius: 4px;
+  padding: 12px;
+  color: var(--axiom-muted);
+  font-size: 12px;
+}
+
 .graph-viz {
   font-family: var(--axiom-monospace);
   font-size: 11px;
@@ -348,11 +357,72 @@ body {
   border: 1px solid var(--axiom-border);
   padding: 12px;
   border-radius: 4px;
-  line-height: 1.6;
+  line-height: 1.45;
+  overflow: hidden;
 }
 
-.graph-node {
+.graph-guide {
+  color: var(--axiom-muted);
+  font-family: var(--axiom-sans);
+  font-size: 10px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.graph-tree-row {
   display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 0;
+  min-width: 0;
+}
+
+.graph-depth-1 { padding-left: 12px; }
+.graph-depth-2 { padding-left: 28px; }
+.graph-depth-3 { padding-left: 44px; }
+
+.graph-branch {
+  color: var(--axiom-muted);
+  width: 16px;
+  flex: 0 0 16px;
+}
+
+.graph-edge-label {
+  color: var(--axiom-muted);
+  flex: 0 0 auto;
+  max-width: 104px;
+  white-space: normal;
+}
+
+.graph-arrow {
+  color: var(--axiom-muted);
+  flex: 0 0 auto;
+}
+
+.graph-kind-tag {
+  border: 1px solid var(--axiom-border);
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: 9px;
+  line-height: 16px;
+  text-transform: uppercase;
+  color: var(--axiom-muted);
+  background: var(--axiom-bg);
+  flex: 0 0 auto;
+}
+
+.graph-kind-repo { color: var(--axiom-accent); border-color: color-mix(in srgb, var(--axiom-accent) 40%, var(--axiom-border)); }
+.graph-kind-incident,
+.graph-kind-memory { color: var(--axiom-risk-high); border-color: color-mix(in srgb, var(--axiom-risk-high) 40%, var(--axiom-border)); }
+.graph-kind-file { color: var(--axiom-risk-low); border-color: color-mix(in srgb, var(--axiom-risk-low) 40%, var(--axiom-border)); }
+.graph-kind-dependency { color: var(--axiom-risk-med); border-color: color-mix(in srgb, var(--axiom-risk-med) 40%, var(--axiom-border)); }
+
+.graph-label {
+  color: var(--axiom-text);
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .graph-indent-0 { }

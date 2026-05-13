@@ -6,19 +6,22 @@ export type SidebarTab = 'memory' | 'risks' | 'graph' | 'ai';
 
 export interface MemoryTabData {
   activeFile: string;
+  status: string[];
   historical: string[];
   intent: string[];
   timeline: { date: string; event: string; desc: string }[];
   related: string[];
+  retrievalReasons: string[];
 }
 
 export interface RiskTabData {
   activeFile: string;
   score: 'LOW' | 'MEDIUM' | 'HIGH';
   regressions: string[];
-  drift: { expected: string; observed: string };
+  drift: { expected: string; observed: string; source?: string };
   protected: string;
   trace: string[];
+  ruleSources: string[];
 }
 
 export interface GraphTabData {
@@ -28,6 +31,7 @@ export interface GraphTabData {
   sharedContext: string[];
   signals: string;
   flow: string;
+  connectedRepositories: string[];
 }
 
 export interface AITabData {
@@ -36,6 +40,7 @@ export interface AITabData {
   compressedMemory: string;
   quality: string;
   sources: string[];
+  retrievalReasons: string[];
 }
 
 export type SidebarTabData = MemoryTabData | RiskTabData | GraphTabData | AITabData;
@@ -47,10 +52,12 @@ export class AxiomBackendApi {
     const context = await this.retrieve(activeFile);
     return {
       activeFile: this.displayFile(context.file),
+      status: this.statusLines(),
       historical: this.summaries(context.historicalContext, 6),
       intent: this.summaries(context.architecturalIntent, 6),
       timeline: context.timeline.map((event) => this.timelineRow(event)).slice(-6),
       related: [...new Set([...context.connectedRepositories, ...context.relatedIncidents.flatMap((memory) => memory.relatedEntities.map((entity) => entity.label))])].slice(0, 8),
+      retrievalReasons: context.retrievalReasons,
     };
   }
 
@@ -64,9 +71,11 @@ export class AxiomBackendApi {
       drift: {
         expected: drift?.expected ?? 'declared architecture memory',
         observed: drift?.observed ?? 'no major drift detected',
+        source: drift?.ruleSource,
       },
       protected: this.protectedKnowledge(context.historicalContext),
       trace: context.risks.trace.map((source) => this.trace(source)).slice(0, 8),
+      ruleSources: context.ruleSources,
     };
   }
 
@@ -80,6 +89,7 @@ export class AxiomBackendApi {
       sharedContext: this.summaries([...context.relatedIncidents, ...context.architecturalIntent], 6),
       signals: `${graph.nodes.length} linked nodes\n${graph.edges.length} graph relationships\n${context.timeline.length} timeline events`,
       flow: this.flow(context.timeline),
+      connectedRepositories: context.connectedRepositories,
     };
   }
 
@@ -91,6 +101,7 @@ export class AxiomBackendApi {
       compressedMemory: context.compressedPacket.text || 'memory packet pending ingestion',
       quality: `${context.compressedPacket.quality} CONFIDENCE`,
       sources: [...new Set(context.compressedPacket.provenance.map((source) => source.label))].slice(0, 8),
+      retrievalReasons: context.retrievalReasons,
     };
   }
 
@@ -99,6 +110,66 @@ export class AxiomBackendApi {
     if (tab === 'graph') return this.getGraphTabData(activeFile);
     if (tab === 'ai') return this.getAITabData(activeFile);
     return this.getMemoryTabData(activeFile);
+  }
+
+  public async getAIContextMarkdown(activeFile?: string): Promise<string> {
+    const context = await this.retrieve(activeFile);
+    return [
+      '# AXIOM AI Context Packet',
+      '',
+      `Scope: ${context.repo}${context.file ? ` / ${context.file}` : ''}`,
+      `Generated: ${this.shortTime(context.lastUpdatedAt)}`,
+      '',
+      '## Compressed Memory',
+      context.compressedPacket.text || 'No compressed packet available yet.',
+      '',
+      '## Architectural Intent',
+      ...this.summaries(context.architecturalIntent, 6).map((item) => `- ${item}`),
+      '',
+      '## Historical Context',
+      ...this.summaries(context.historicalContext, 6).map((item) => `- ${item}`),
+      '',
+      '## Risks And Drift',
+      `- Risk score: ${context.risks.score}`,
+      ...context.risks.reasons.map((item) => `- ${item}`),
+      ...context.drift.slice(0, 4).map((drift) => `- Drift: expected ${drift.expected}; observed ${drift.observed}; source ${drift.ruleSource ?? 'unknown'}`),
+      '',
+      '## Connected Repositories',
+      ...(context.connectedRepositories.length ? context.connectedRepositories.map((repo) => `- ${repo}`) : ['- none']),
+      '',
+      '## Retrieval Explanation',
+      ...context.retrievalReasons.map((reason) => `- ${reason}`),
+      '',
+      '## Sources',
+      ...[...new Set(context.compressedPacket.provenance.map((source) => this.trace(source)))].map((source) => `- ${source}`),
+    ].join('\n');
+  }
+
+  public async getAIComparisonMarkdown(activeFile?: string): Promise<string> {
+    const context = await this.retrieve(activeFile);
+    const rawLines = [
+      ...this.summaries(context.historicalContext, 8),
+      ...this.summaries(context.architecturalIntent, 8),
+      ...context.relatedIncidents.slice(0, 6).map((memory) => memory.summary),
+      ...context.drift.slice(0, 4).map((drift) => `Drift: expected ${drift.expected}; observed ${drift.observed}`),
+    ];
+    return [
+      '# AXIOM Raw vs Compressed Context',
+      '',
+      `Scope: ${context.repo}${context.file ? ` / ${context.file}` : ''}`,
+      '',
+      '## Raw Retrieved Memory',
+      ...(rawLines.length ? rawLines.map((line) => `- ${line}`) : ['- No raw retrieved memory available yet.']),
+      '',
+      '## AXIOM Compressed Packet',
+      context.compressedPacket.text || 'No compressed packet available yet.',
+      '',
+      '## Compression',
+      `${context.compressedPacket.rawTokenEstimate} -> ${context.compressedPacket.compressedTokenEstimate} tokens`,
+      '',
+      '## Why These Memories',
+      ...context.retrievalReasons.map((reason) => `- ${reason}`),
+    ].join('\n');
   }
 
   private async retrieve(activeFile?: string): Promise<ContextRetrievalResult> {
@@ -138,5 +209,24 @@ export class AxiomBackendApi {
       .filter((title, index, all) => all.indexOf(title) === index)
       .slice(-4);
     return labels.length ? labels.join(' -> ') : 'signals -> memory -> retrieval';
+  }
+
+  private statusLines(): string[] {
+    const status = this.kernel.getStatus();
+    return [
+      status.lastLocalIngestAt ? `local sync ${this.shortTime(status.lastLocalIngestAt)}` : 'local sync pending',
+      status.lastRemotePollAt ? `remote poll ${this.shortTime(status.lastRemotePollAt)}` : 'remote poll pending',
+      status.lastRuleRefreshAt ? `rules refreshed ${this.shortTime(status.lastRuleRefreshAt)}` : 'rules pending',
+      `${status.connectedRepositories.length} connected repos`,
+    ];
+  }
+
+  private shortTime(value: string): string {
+    return new Date(value).toLocaleString(undefined, {
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   }
 }

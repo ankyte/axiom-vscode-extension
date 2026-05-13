@@ -43,10 +43,12 @@ class AxiomBackendApi {
         const context = await this.retrieve(activeFile);
         return {
             activeFile: this.displayFile(context.file),
+            status: this.statusLines(),
             historical: this.summaries(context.historicalContext, 6),
             intent: this.summaries(context.architecturalIntent, 6),
             timeline: context.timeline.map((event) => this.timelineRow(event)).slice(-6),
             related: [...new Set([...context.connectedRepositories, ...context.relatedIncidents.flatMap((memory) => memory.relatedEntities.map((entity) => entity.label))])].slice(0, 8),
+            retrievalReasons: context.retrievalReasons,
         };
     }
     async getRiskTabData(activeFile) {
@@ -59,9 +61,11 @@ class AxiomBackendApi {
             drift: {
                 expected: drift?.expected ?? 'declared architecture memory',
                 observed: drift?.observed ?? 'no major drift detected',
+                source: drift?.ruleSource,
             },
             protected: this.protectedKnowledge(context.historicalContext),
             trace: context.risks.trace.map((source) => this.trace(source)).slice(0, 8),
+            ruleSources: context.ruleSources,
         };
     }
     async getGraphTabData(activeFile) {
@@ -74,6 +78,7 @@ class AxiomBackendApi {
             sharedContext: this.summaries([...context.relatedIncidents, ...context.architecturalIntent], 6),
             signals: `${graph.nodes.length} linked nodes\n${graph.edges.length} graph relationships\n${context.timeline.length} timeline events`,
             flow: this.flow(context.timeline),
+            connectedRepositories: context.connectedRepositories,
         };
     }
     async getAITabData(activeFile) {
@@ -84,6 +89,7 @@ class AxiomBackendApi {
             compressedMemory: context.compressedPacket.text || 'memory packet pending ingestion',
             quality: `${context.compressedPacket.quality} CONFIDENCE`,
             sources: [...new Set(context.compressedPacket.provenance.map((source) => source.label))].slice(0, 8),
+            retrievalReasons: context.retrievalReasons,
         };
     }
     async getTabData(tab, activeFile) {
@@ -94,6 +100,64 @@ class AxiomBackendApi {
         if (tab === 'ai')
             return this.getAITabData(activeFile);
         return this.getMemoryTabData(activeFile);
+    }
+    async getAIContextMarkdown(activeFile) {
+        const context = await this.retrieve(activeFile);
+        return [
+            '# AXIOM AI Context Packet',
+            '',
+            `Scope: ${context.repo}${context.file ? ` / ${context.file}` : ''}`,
+            `Generated: ${this.shortTime(context.lastUpdatedAt)}`,
+            '',
+            '## Compressed Memory',
+            context.compressedPacket.text || 'No compressed packet available yet.',
+            '',
+            '## Architectural Intent',
+            ...this.summaries(context.architecturalIntent, 6).map((item) => `- ${item}`),
+            '',
+            '## Historical Context',
+            ...this.summaries(context.historicalContext, 6).map((item) => `- ${item}`),
+            '',
+            '## Risks And Drift',
+            `- Risk score: ${context.risks.score}`,
+            ...context.risks.reasons.map((item) => `- ${item}`),
+            ...context.drift.slice(0, 4).map((drift) => `- Drift: expected ${drift.expected}; observed ${drift.observed}; source ${drift.ruleSource ?? 'unknown'}`),
+            '',
+            '## Connected Repositories',
+            ...(context.connectedRepositories.length ? context.connectedRepositories.map((repo) => `- ${repo}`) : ['- none']),
+            '',
+            '## Retrieval Explanation',
+            ...context.retrievalReasons.map((reason) => `- ${reason}`),
+            '',
+            '## Sources',
+            ...[...new Set(context.compressedPacket.provenance.map((source) => this.trace(source)))].map((source) => `- ${source}`),
+        ].join('\n');
+    }
+    async getAIComparisonMarkdown(activeFile) {
+        const context = await this.retrieve(activeFile);
+        const rawLines = [
+            ...this.summaries(context.historicalContext, 8),
+            ...this.summaries(context.architecturalIntent, 8),
+            ...context.relatedIncidents.slice(0, 6).map((memory) => memory.summary),
+            ...context.drift.slice(0, 4).map((drift) => `Drift: expected ${drift.expected}; observed ${drift.observed}`),
+        ];
+        return [
+            '# AXIOM Raw vs Compressed Context',
+            '',
+            `Scope: ${context.repo}${context.file ? ` / ${context.file}` : ''}`,
+            '',
+            '## Raw Retrieved Memory',
+            ...(rawLines.length ? rawLines.map((line) => `- ${line}`) : ['- No raw retrieved memory available yet.']),
+            '',
+            '## AXIOM Compressed Packet',
+            context.compressedPacket.text || 'No compressed packet available yet.',
+            '',
+            '## Compression',
+            `${context.compressedPacket.rawTokenEstimate} -> ${context.compressedPacket.compressedTokenEstimate} tokens`,
+            '',
+            '## Why These Memories',
+            ...context.retrievalReasons.map((reason) => `- ${reason}`),
+        ].join('\n');
     }
     async retrieve(activeFile) {
         const current = this.kernel.getActiveContext();
@@ -126,6 +190,23 @@ class AxiomBackendApi {
             .filter((title, index, all) => all.indexOf(title) === index)
             .slice(-4);
         return labels.length ? labels.join(' -> ') : 'signals -> memory -> retrieval';
+    }
+    statusLines() {
+        const status = this.kernel.getStatus();
+        return [
+            status.lastLocalIngestAt ? `local sync ${this.shortTime(status.lastLocalIngestAt)}` : 'local sync pending',
+            status.lastRemotePollAt ? `remote poll ${this.shortTime(status.lastRemotePollAt)}` : 'remote poll pending',
+            status.lastRuleRefreshAt ? `rules refreshed ${this.shortTime(status.lastRuleRefreshAt)}` : 'rules pending',
+            `${status.connectedRepositories.length} connected repos`,
+        ];
+    }
+    shortTime(value) {
+        return new Date(value).toLocaleString(undefined, {
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
     }
 }
 exports.AxiomBackendApi = AxiomBackendApi;

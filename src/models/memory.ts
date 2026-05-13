@@ -13,7 +13,14 @@ export type MemoryType =
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export interface Provenance {
-  provider: 'local' | 'azure-devops' | 'memory-store' | 'relationship-engine' | 'drift-engine' | 'compression-engine';
+  provider:
+    | 'local'
+    | 'azure-devops'
+    | 'memory-store'
+    | 'relationship-engine'
+    | 'drift-engine'
+    | 'compression-engine'
+    | 'architecture-rule-provider';
   sourceId: string;
   label: string;
   url?: string;
@@ -78,6 +85,8 @@ export interface TimelineEvent {
 
 export interface DriftMemory extends MemoryRecord {
   type: 'DRIFT';
+  ruleId?: string;
+  ruleSource?: string;
   expected: string;
   observed: string;
   severity: RiskLevel;
@@ -102,6 +111,7 @@ export interface RiskReport {
     todoDensity: number;
     fileChurn: number;
     hotfixMentions: number;
+    driftFindings: number;
   };
 }
 
@@ -116,4 +126,7 @@ export interface ContextRetrievalResult {
   compressedPacket: CompressedPacket;
   connectedRepositories: string[];
   timeline: TimelineEvent[];
+  ruleSources: string[];
+  retrievalReasons: string[];
+  lastUpdatedAt: string;
 }

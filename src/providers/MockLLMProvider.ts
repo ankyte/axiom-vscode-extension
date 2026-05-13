@@ -75,7 +75,7 @@ export class MockLLMProvider implements ILLMProvider {
     if (lower.includes('idempot')) return 'ensure repeated async execution cannot double-apply business effects';
     if (lower.includes('rollback')) return 'avoid reopening the regression that forced rollback';
     if (lower.includes('architecture')) return 'keep implementation aligned with declared architecture';
-    return 'preserve operational context while changing code';
+    return 'preserve organizational context while changing code';
   }
 
   public async generateContextPacket(memories: MemoryRecord[]): Promise<CompressedPacket> {

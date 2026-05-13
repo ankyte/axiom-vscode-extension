@@ -1,5 +1,5 @@
 # AXIOM
-## Operational Memory for Engineering Organizations
+## Organizational Memory for Engineering Organizations
 
 > "Code remembers."
 
@@ -47,7 +47,7 @@ Organizations lose intent.
 AXIOM continuously builds:
 - historical memory
 - architectural memory
-- operational memory
+- organizational memory
 - cross-repository relationships
 - machine-consumable context
 
@@ -572,7 +572,7 @@ AXIOM interprets this as:
 System rejected previous evolution
 ```
 
-This becomes a high-value operational memory signal.
+This becomes a high-value organizational memory signal.
 
 ---
 
@@ -591,7 +591,7 @@ AXIOM correlates:
 - repositories
 - retry patterns
 
-This builds long-term operational memory.
+This builds long-term organizational memory.
 
 ---
 
@@ -696,7 +696,7 @@ With AXIOM:
 
 ## Faster Onboarding
 
-New engineers inherit operational memory instantly.
+New engineers inherit organizational memory instantly.
 
 ---
 
